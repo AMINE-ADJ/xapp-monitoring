@@ -1,0 +1,12 @@
+all:
+  hosts:
+    10.64.45.9:
+      xx-name: bp1
+      xx-local-ip: 10.64.45.9
+  children:
+    computes:
+      hosts:
+        10.64.45.9:
+    masters:
+      hosts:
+        10.64.45.102:

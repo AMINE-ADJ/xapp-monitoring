@@ -57,9 +57,9 @@ Follow the instructions in the `kubernetes-setup` folder to set up your Kubernet
 ### Step 4: Proceed to Ansible Installation
 Once your Kubernetes environment is set up, you can proceed with the installation using the provided Ansible playbooks.
 
-    Begin by updating the inventories/UTH/hosts.yml file with the correct IPs and node names corresponding to your VMs.
+Begin by updating the inventories/UTH/hosts.yml file with the correct IPs and node names corresponding to your VMs.
 
-    Next, modify the inventories/UTH/group_vars/all file to include the appropriate ansible_user value.
+Next, modify the inventories/UTH/group_vars/all file to include the appropriate ansible_user value.
 
 After completing these steps, you can proceed with deploying the scenario by executing the following command:
 ```bash

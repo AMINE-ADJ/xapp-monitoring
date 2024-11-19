@@ -1,0 +1,26 @@
+---
+- name: Get latest version of cri-dockerd
+  shell: |
+    VER=$(curl -s https://api.github.com/repos/Mirantis/cri-dockerd/releases/latest | grep tag_name | cut -d '"' -f 4 | sed 's/v//g')
+    echo ${VER}
+  register: cri_dockerd_version
+
+- name: Download and install cri-dockerd
+  shell: |
+    wget https://github.com/Mirantis/cri-dockerd/releases/download/v{{ cri_dockerd_version.stdout }}/cri-dockerd-{{ cri_dockerd_version.stdout }}.amd64.tgz
+    tar xvf cri-dockerd-{{ cri_dockerd_version.stdout }}.amd64.tgz
+    sudo mv cri-dockerd/cri-dockerd /usr/local/bin/
+
+- name: Download systemd service and socket files for cri-dockerd
+  shell: |
+    wget https://raw.githubusercontent.com/Mirantis/cri-dockerd/master/packaging/systemd/cri-docker.service
+    wget https://raw.githubusercontent.com/Mirantis/cri-dockerd/master/packaging/systemd/cri-docker.socket
+    sudo mv cri-docker.socket cri-docker.service /etc/systemd/system/
+    sudo sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+
+- name: Enable and start cri-docker services
+  shell: |
+    sudo systemctl daemon-reload
+    sudo systemctl enable cri-docker.service
+    sudo systemctl enable --now cri-docker.socket
+
