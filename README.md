@@ -127,8 +127,9 @@ You can view or edit configuration files for the Core, RAN, FlexRIC, and UE in t
 
 To uninstall the previous deployment (OAI Core, RF Simulator, FlexRIC, and UE), run the following Ansible playbook:
 
+```bash
 ansible-playbook -i inventories/UTH destroy-oai-flexric.yaml
-
+```
 
 This playbook will cleanly remove all components of the blueprint deployment.
 
