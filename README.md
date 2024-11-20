@@ -34,8 +34,9 @@ https://gitlab.noc.onelab.eu/onelab/slices-5g-blueprint/-/blob/main/5G_deploymen
 
 ### Step 1: Clone the Repository
 Clone the repository to your VMs.
-
+```bash
 git clone https://gitlab.noc.onelab.eu/dkefalas/xapp-monitoring.git
+```
 ---
 
 ### Step 2: Verify Your Kubernetes Environment
