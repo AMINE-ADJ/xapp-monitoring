@@ -72,7 +72,27 @@ After completing these steps, you can proceed with deploying the scenario by exe
 ```bash
 ansible-playbook -i inventories/UTH 5g.yaml --extra-vars "@params.oai-flexric.yaml"
 ```
-If everything has been set up correctly, you should be able to ping from your UE to the 5GCN. To do this, execute a command to ping the 5GCN from your UE. 
+If everything has been set up correctly, all the following pods should be deployed:
+```bash
+kubectl get pods -n blueprint
+NAME                              READY   STATUS    RESTARTS   AGE
+oai-amf-6486c9d49c-snnt5          1/1     Running   0          45m
+oai-ausf-84ffb6bc7c-vjzdj         1/1     Running   0          45m
+oai-core-mysql-7f7b695b8b-s4l66   1/1     Running   0          45m
+oai-flexric-5db68d7bf6-n28q8      1/1     Running   0          44m
+oai-gnb-c5b4659c6-vghc7           1/1     Running   0          44m
+oai-nr-ue-7dbdb954fc-4rbn4        1/1     Running   0          44m
+oai-nrf-7dbb6d4b9-s9l2v           1/1     Running   0          45m
+oai-smf-5d654698cf-7wpnh          1/1     Running   0          45m
+oai-udm-7c49dc8f66-wsrtf          1/1     Running   0          45m
+oai-udr-5d85996695-zg5g4          1/1     Running   0          45m
+oai-upf-86dc5998c8-spzxz          1/1     Running   0          45m
+```
+
+
+
+
+At this point, you should be able to ping from your UE to the 5GCN. To do this, execute a command to ping the 5GCN from your UE. 
 ```bash
 kubectl exec -ti oai-nr-ue-7dbdb954fc-4rbn4 -n blueprint -- ping 12.1.1.1
 ```
