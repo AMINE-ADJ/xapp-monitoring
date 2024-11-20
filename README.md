@@ -24,6 +24,9 @@ The goal of the project is to develop and deploy an xApp that leverages the KPM 
 - FlexRIC (cloud-based)
 
 ---
+This repo uses a subpart of this implementation, please refer in case you need more details:
+https://gitlab.noc.onelab.eu/onelab/slices-5g-blueprint/-/blob/main/5G_deployment_revised.md
+---
 
 ## Getting Started
 
@@ -98,28 +101,28 @@ This will connect you to the RIC environment, where you can choose the programmi
 You can view or edit configuration files for the Core, RAN, FlexRIC, and UE in the following directories:
 
 - **Core Files**:  
-  `blueprint/sopnode/ansible/roles/flexric/files/blueprint/oai-flexric/core_files`
+  `roles/flexric/files/blueprint/oai-flexric/core_files`
 
 - **Core Configurations**:  
-  `blueprint/sopnode/ansible/roles/flexric/files/blueprint/oai-flexric/core_values`
+  `roles/flexric/files/blueprint/oai-flexric/core_values`
 
 - **RAN Files**:  
-  `blueprint/sopnode/ansible/roles/flexric/files/blueprint/oai-flexric/ran_files`
+  `roles/flexric/files/blueprint/oai-flexric/ran_files`
 
 - **RAN Configurations**:  
-  `blueprint/sopnode/ansible/roles/flexric/files/blueprint/oai-flexric/ran_values`
+  `roles/flexric/files/blueprint/oai-flexric/ran_values`
 
 - **FlexRIC Files**:  
-  `blueprint/sopnode/ansible/roles/flexric/files/blueprint/oai-flexric/flexric_files`
+  `roles/flexric/files/blueprint/oai-flexric/flexric_files`
 
 - **FlexRIC Configurations**:  
-  `blueprint/sopnode/ansible/roles/flexric/files/blueprint/oai-flexric/flexric_values`
+  `roles/flexric/files/blueprint/oai-flexric/flexric_values`
 
 - **UE Files**:  
-  `blueprint/sopnode/ansible/roles/flexric/files/blueprint/oai-flexric/ue_files`
+  `roles/flexric/files/blueprint/oai-flexric/ue_files`
 
 - **UE Configurations**:  
-  `blueprint/sopnode/ansible/roles/flexric/files/blueprint/oai-flexric/ue_values`
+  `roles/flexric/files/blueprint/oai-flexric/ue_values`
 
 ---
 
