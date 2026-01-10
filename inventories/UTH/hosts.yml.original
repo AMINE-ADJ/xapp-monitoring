@@ -1,0 +1,19 @@
+all:
+  children:
+    computes:
+      hosts:
+        127.0.0.1:
+          xx-name: post-5g-bp-ttsou-2
+          xx-local-ip: 127.0.0.1
+    masters:
+      hosts:
+        127.0.0.1:
+          xx-name: dimitris
+          xx-local-ip: 127.0.0.1
+
+#    switches:
+#      hosts:
+#    rans:
+#      hosts:
+#        10.64.45.22:
+#          xx-name: bp2
