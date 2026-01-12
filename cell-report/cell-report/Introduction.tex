@@ -1,0 +1,30 @@
+
+
+\chapter{Introduction}
+\label{chap:introduction}
+
+\section{Project Overview}
+The deployment of 5G networks facilitates advanced monitoring through the Open Radio Access Network (O-RAN) architecture. This project focuses on deploying a complete 5G experimentation platform using OpenAirInterface (OAI) and FlexRIC. The core objective is to develop and deploy a custom xApp that collects Key Performance Metrics (KPM) from the Radio Access Network (RAN) to generate a comprehensive dataset for network analysis.
+
+\section{Objectives}
+The primary goals of this project are:
+\begin{enumerate}
+    \item \textbf{Deployment}: Establish a fully containerized 5G environment (Core, RAN, FlexRIC) on Kubernetes.
+    \item \textbf{xApp Development}: Implement a C-based xApp to interface with the RAN via the E2 protocol.
+    \item \textbf{Data Collection}: Generate a high-fidelity dataset of RAN metrics (MAC, RLC, PDCP, KPM) for performance analysis.
+\end{enumerate}
+
+\section{Infrastructure Stabilization \& Verification}
+During the deployment phase, critical stability issues affecting the 5G Core Network were resolved. Specifically, the \texttt{oai-core} database (MySQL) initially exhibited persistent crash loops due to initialization race conditions. This was addressed by refining the deployment configuration to ensure robust volume persistence and correct initialization sequences, stabilizing the entire Core Network.
+
+Following stabilization, end-to-end connectivity was verified. Successful ICMP (Ping) tests were executed between the simulated User Equipment (UE) and the External Data Network (via the UPF), validating the successful establishment of PDU sessions and the integrity of the GTP-U tunneling.
+
+\section{Report Structure}
+This report details the project implementation:
+\begin{itemize}
+    \item \textbf{Chapter 2: System Architecture} outlines the O-RAN components (OAI 5G, FlexRIC).
+    \item \textbf{Chapter 3: Deployment Environment} describes the Kubernetes and Ansible setup.
+    \item \textbf{Chapter 4: xApp Implementation} explains the xApp logic and data extraction.
+    \item \textbf{Chapter 5: Results \& Dataset} analyzes the generated KPM dataset.
+    \item \textbf{Chapter 6: Conclusion} summarizes the achievements.
+\end{itemize}

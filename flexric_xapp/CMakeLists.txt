@@ -28,7 +28,7 @@ link_directories(
 
 # Source files
 set(SOURCES
-    xapp_kpm_metrics_collector.c
+    xapp_kpm_metrics_collector_v2.c
 )
 
 # Executable

@@ -1,77 +1,148 @@
 #!/bin/bash
-#===============================================================================
-# Start Data Collection with Traffic Generation
-# Run this after the 5G infrastructure is up
-#===============================================================================
+# start-collection.sh
+# Automates Traffic Generation (iperf3) AND KPM xApp Collection
+
+set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NAMESPACE="blueprint"
-DURATION=${1:-300}  # Default 5 minutes
-BANDWIDTH=${2:-20M}  # Default 20 Mbps
+DURATION=${1:-60}  # Default 60 seconds
+BANDWIDTH=${2:-20M}
 
 echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║         Start Data Collection                                 ║"
+echo "║      5G Traffic Generation & xApp Data Collection             ║"
 echo "╚═══════════════════════════════════════════════════════════════╝"
-echo ""
-echo "Duration: ${DURATION}s, Bandwidth: ${BANDWIDTH}"
+echo "Duration: ${DURATION}s | Bandwidth: ${BANDWIDTH}"
 echo ""
 
-# Check if infrastructure is running
-UE_POD=$(kubectl get pods -n $NAMESPACE --no-headers 2>/dev/null | grep "oai-nr-ue" | grep "Running" | awk '{print $1}' | head -1)
-GNB_POD=$(kubectl get pods -n $NAMESPACE --no-headers 2>/dev/null | grep "oai-gnb" | grep "Running" | awk '{print $1}' | head -1)
+# 1. Infrastructure Checks
+# ------------------------------------------------------------------
+echo "[INFO] Checking infrastructure..."
+UE_POD=$(kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=oai-nr-ue -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+UPF_POD=$(kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=oai-upf -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+FLEXRIC_POD=$(kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=oai-flexric -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 
-if [ -z "$UE_POD" ] || [ -z "$GNB_POD" ]; then
-    echo "[ERROR] 5G infrastructure not running. Please run ./quick-start.sh first"
+if [[ -z "$UE_POD" || -z "$UPF_POD" || -z "$FLEXRIC_POD" ]]; then
+    echo "[ERROR] Pods not found. Is the network deployed?"
     exit 1
 fi
 
-# Get gNB IP (we'll use gNB as iperf server since it has iperf3)
-GNB_IP=$(kubectl get pods -n $NAMESPACE -o wide | grep "oai-gnb" | awk '{print $6}')
+UPF_IP="12.1.1.1" # Fixed OAI UPF IP
+echo "UE: $UE_POD"
+echo "UPF: $UPF_POD ($UPF_IP)"
+echo "RIC: $FLEXRIC_POD"
 
-# Check UE tunnel
-TUNNEL_IP=$(kubectl exec -n $NAMESPACE $UE_POD -c nr-ue -- ip addr show oaitun_ue1 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d'/' -f1)
-
-if [ -z "$TUNNEL_IP" ]; then
-    echo "[ERROR] UE tunnel not ready. Wait a moment and try again."
+# Check UE Tunnel
+if ! kubectl exec -n $NAMESPACE $UE_POD -c nr-ue -- ip addr show oaitun_ue1 | grep -q "inet"; then
+    echo "[ERROR] UE tunnel (oaitun_ue1) is NOT active. Traffic will fail."
     exit 1
 fi
 
-echo "[INFO] UE Pod: $UE_POD"
-echo "[INFO] UE Tunnel IP: $TUNNEL_IP"
-echo "[INFO] gNB Pod: $GNB_POD"
-echo "[INFO] gNB IP: $GNB_IP"
+# 2. Setup iperf3 on UPF
+# ------------------------------------------------------------------
 echo ""
+echo "[INFO] Setting up iperf3 Server on UPF..."
+if ! kubectl exec -n $NAMESPACE $UPF_POD -- which iperf3 >/dev/null 2>&1; then
+    echo "       Installing iperf3..."
+    kubectl exec -n $NAMESPACE $UPF_POD -- bash -c "apt-get update && apt-get install -y iperf3" >/dev/null 2>&1
+fi
+kubectl exec -n $NAMESPACE $UPF_POD -- pkill iperf3 2>/dev/null || true
+kubectl exec -n $NAMESPACE $UPF_POD -- iperf3 -s -p 5201 -D 2>/dev/null
 
-# Clear old data
-rm -f "$SCRIPT_DIR/cell_xapp_monitor/data/cell_monitoring_dataset.csv"
+# 3. Deploy & Compile xApp on FlexRIC
+# ------------------------------------------------------------------
+echo ""
+echo "[INFO] Deploying KPM xApp to FlexRIC..."
+XAPP_SRC="$SCRIPT_DIR/flexric_xapp/xapp_kpm_metrics_collector_v2.c"
+REMOTE_DIR="/flexric/examples/xApp/c/monitor"
 
-# Start iperf3 server on gNB
-echo "[INFO] Starting iperf3 server on gNB..."
-kubectl exec -n $NAMESPACE $GNB_POD -- pkill iperf3 2>/dev/null || true
-kubectl exec -n $NAMESPACE $GNB_POD -- iperf3 -s -p 5201 -D 2>/dev/null &
-sleep 2
+if [ ! -f "$XAPP_SRC" ]; then
+    echo "[ERROR] Source file not found: $XAPP_SRC"
+    exit 1
+fi
 
-# Start data collector
-echo "[INFO] Starting data collector (duration: ${DURATION}s)..."
-cd "$SCRIPT_DIR/cell_xapp_monitor"
-python3 cell_xapp_monitor.py -d $DURATION -o ./data &
-COLLECTOR_PID=$!
-sleep 5
+# Copy Source
+kubectl cp "$XAPP_SRC" "$NAMESPACE/$FLEXRIC_POD:$REMOTE_DIR/xapp_kpm_metrics_collector_v2.c"
 
-# Start traffic generation
-echo "[INFO] Starting traffic generation (${BANDWIDTH} for ${DURATION}s)..."
-kubectl exec -n $NAMESPACE $UE_POD -c nr-ue -- iperf3 -c $GNB_IP -p 5201 -t $DURATION -b $BANDWIDTH &
+# Compile
+echo "[INFO] Compiling xApp..."
+kubectl exec -n $NAMESPACE $FLEXRIC_POD -- bash -c "
+cd $REMOTE_DIR
+gcc -o xapp_kpm_v2 xapp_kpm_metrics_collector_v2.c \
+    -I/flexric/src -I/flexric/build/src \
+    -DKPM_V3_00 -DE2AP_V3 \
+    -L/flexric/build/src/xApp -le42_xapp_shared -lpthread -lsctp
+cp xapp_kpm_v2 /flexric/build/examples/xApp/c/monitor/
+"
+
+# 4. Start Collection & Traffic
+# ------------------------------------------------------------------
+echo ""
+echo "[INFO] Starting Collection & Traffic (Duration: ${DURATION}s)..."
+
+# Output file path in pod
+POD_OUTPUT="/tmp/kpm_metrics.csv"
+
+# Start xApp (Background)
+# We use stdbuf to avoid buffering issues and timeout to stop it automatically
+kubectl exec -n $NAMESPACE $FLEXRIC_POD -- bash -c "
+    export LD_LIBRARY_PATH=/flexric/build/src/xApp:/usr/local/lib:\$LD_LIBRARY_PATH
+    timeout $((DURATION + 5)) /flexric/build/examples/xApp/c/monitor/xapp_kpm_v2 > $POD_OUTPUT 2>&1
+" &
+XAPP_PID=$!
+
+# Start Traffic (Background)
+sleep 2 # Give xApp a moment to subscribe
+kubectl exec -n $NAMESPACE $UE_POD -c nr-ue -- iperf3 -c $UPF_IP -p 5201 -t $DURATION -b $BANDWIDTH >/dev/null &
 TRAFFIC_PID=$!
 
+echo "       xApp PID: $XAPP_PID"
+echo "       Traffic PID: $TRAFFIC_PID"
+echo "       Waiting for test to complete..."
+
+# Wait for xApp to finish (it controls the duration via timeout)
+wait $XAPP_PID 2>/dev/null || true
+
+# 5. Retrieve Results
+# ------------------------------------------------------------------
 echo ""
-echo "[INFO] Data collection and traffic generation started!"
-echo "[INFO] Collector PID: $COLLECTOR_PID"
-echo "[INFO] Traffic PID: $TRAFFIC_PID"
-echo ""
-echo "Data will be saved to: $SCRIPT_DIR/cell_xapp_monitor/data/cell_monitoring_dataset.csv"
-echo ""
-echo "To monitor progress:"
-echo "  watch -n 5 'wc -l $SCRIPT_DIR/cell_xapp_monitor/data/cell_monitoring_dataset.csv'"
-echo ""
-echo "To stop early:"
-echo "  kill $COLLECTOR_PID $TRAFFIC_PID"
+echo "[INFO] Retrieving Dataset..."
+DATA_DIR="$SCRIPT_DIR/xapp-dataset"
+mkdir -p "$DATA_DIR"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+LOCAL_FILE="$DATA_DIR/kpm_metrics_${TIMESTAMP}.csv"
+LOG_FILE="$DATA_DIR/gnb_logs_${TIMESTAMP}.txt"
+FINAL_FILE="$DATA_DIR/dataset_full_${TIMESTAMP}.csv"
+
+# Start Log Capture
+echo "[INFO] Capturing gNB logs..."
+GNB_POD=$(kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=oai-gnb -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+kubectl logs -f -n $NAMESPACE $GNB_POD > "$LOG_FILE" 2>&1 &
+LOG_PID=$!
+
+if kubectl cp "$NAMESPACE/$FLEXRIC_POD:/tmp/kpm_metrics_dataset.csv" "$LOCAL_FILE" 2>/dev/null; then
+    ROWS=$(wc -l < "$LOCAL_FILE")
+    echo "[SUCCESS] Data saved to: $LOCAL_FILE"
+    echo "          Rows collected: $ROWS"
+    
+    # Stop Log Capture
+    kill $LOG_PID 2>/dev/null || true
+    
+    # Merge Data
+    echo ""
+    echo "[INFO] Merging with gNB logs..."
+    python3 "$SCRIPT_DIR/merge_metrics.py" "$LOCAL_FILE" "$LOG_FILE" "$FINAL_FILE"
+    
+    echo ""
+    echo "Sample Data (Final):"
+    if [ -f "$FINAL_FILE" ]; then
+        head -n 5 "$FINAL_FILE"
+    else
+        head -n 5 "$LOCAL_FILE"
+    fi
+else
+    kill $LOG_PID 2>/dev/null || true
+    echo "[WARN] Could not retrieve data file. xApp might have failed or produced no output."
+    echo "       Checking xApp logs..."
+    kubectl exec -n $NAMESPACE $FLEXRIC_POD -- cat $POD_OUTPUT
+fi

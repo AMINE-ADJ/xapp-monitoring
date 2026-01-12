@@ -13,10 +13,19 @@
     #update_cache: yes
     #become: yes
 
-- name: Install Kubernetes module via pip
+- name: Check if Kubernetes Python module is installed
+  ansible.builtin.command:
+    cmd: python3 -c "import kubernetes"
+  register: kubernetes_check
+  failed_when: false
+  changed_when: false
+
+- name: Install Kubernetes module via pip (skip if already installed)
   ansible.builtin.pip:
     name: kubernetes
     state: present
+  when: kubernetes_check.rc != 0
+  ignore_errors: true
 
 - name: Check if Helm is installed
   ansible.builtin.command:

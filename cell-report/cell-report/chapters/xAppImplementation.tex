@@ -1,0 +1,199 @@
+\chapter{xApp Implementation}
+\label{chap:xapp}
+
+\section{Design Overview}
+The custom xApp is designed to collect KPM data in real-time. It runs as a sidecar to FlexRIC and communicates over the E2 interface.
+
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1\linewidth]{xapp-architecture.png}
+    \caption{Architecture of the KPM Data Collector xApp.}
+    \label{fig:xapp_arch}
+\end{figure}
+
+
+\section{Implementation Details}
+\subsection{Initialization}
+The xApp initializes the E2 agent and discovers connected nodes:
+\begin{codeblock}[language=c]{xApp Init}
+init_e2_agent_api(args.ip, args.port, args.plmn, "KPM_Collector");
+e2_node_arr_t e2_nodes = e2_nodes_connected();
+\end{codeblock}
+
+\subsection{Data Subscription}
+We subscribe to multiple Service Models (SM) to get a complete view of the RAN state. Subscriptions are set to a 100ms interval:
+\begin{codeblock}[language=c]{Subscriptions}
+// MAC Layer metrics (MCS, BLER, PRB usage)
+report_mac_sm(node_id, 100, sm_cb_mac);
+
+// RLC Layer metrics (PDU counts, Bytes)
+report_rlc_sm(node_id, 100, sm_cb_rlc);
+
+// PDCP & GTP Layer metrics (Throughput, Handover)
+report_pdcp_sm(node_id, 100, sm_cb_pdcp);
+report_gtp_sm(node_id, 100, sm_cb_gtp);
+
+// KPM Service Model (Standardized measurements)
+report_kpm_sm(node_id, 100, sm_cb_kpm, action_def);
+\end{codeblock}
+
+\subsection{Callback Processing}
+Asynchronous callbacks handle incoming data. For example, the KPM callback extracts throughput:
+\begin{codeblock}[language=c]{KPM Callback}
+void sm_cb_kpm(sm_ag_if_rd_t const* rd) {
+    kpm_ind_data_t const* ind = &rd->kpm_stats;
+    // Extract DL/UL Volume
+    if (rec->type == DRB_PDCP_SDU_VOLUME_DL) 
+        record.dl_throughput = rec->value;
+}
+\end{codeblock}
+
+\section{Data Aggregation}
+The xApp aggregates metrics from different layers into a single CSV record keyed by timestamp and RNTI (UE Identifier). This aligned dataset is crucial for training ML models.
+
+\section{Metrics Significance \& Interpretation}
+The collector captures a comprehensive set of metrics providing visibility into Coverage, Quality, Reliability, and Load. Their interpretation is detailed below:
+
+\subsection{Radio Conditions (Coverage \& Quality)}
+\begin{itemize}
+    \item \textbf{RSRP (Reference Signal Received Power)}: Indicates signal strength.
+    \begin{itemize}
+        \item \textit{Interpretation}: Values $>-80$ dBm represent excellent coverage. Values $<-100$ dBm typical of cell-edge. In our RF simulator, values like $-44$ dBm indicate effectively "wired" ideal conditions.
+    \end{itemize}
+    \item \textbf{SINR (Signal-to-Interference-plus-Noise Ratio)}: Indicates signal quality.
+    \begin{itemize}
+        \item \textit{Interpretation}: High SINR ($>20$ dB) allows high Modulation Coding Schemes (MCS). Low SINR ($<5$ dB) forces robust, low-throughput modulation (QPSK).
+    \end{itemize}
+    \item \textbf{RSRQ (Reference Signal Received Quality)}: Indicates quality relative to load/noise.
+\end{itemize}
+
+\subsection{Reliability \& Errors}
+\begin{itemize}
+    \item \textbf{BLER (Block Error Rate)}: The ratio of erroneous blocks to total blocks.
+    \begin{itemize}
+        \item \textit{Interpretation}: A key reliability metric. 5G typically targets $\approx 10\%$ BLER for initial transmissions, relying on HARQ for correction. Sustained high BLER ($>10\%$) after retransmissions indicates link failure.
+    \end{itemize}
+    \item \textbf{HARQ Retransmissions}: Count of re-sent packets.
+    \begin{itemize}
+        \item \textit{Interpretation}: High retransmissions with low residual BLER means the HARQ mechanism is working correctly.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Performance \& Load}
+\begin{itemize}
+    \item \textbf{Throughput (DL/UL)}: The actual user data rate.
+    \begin{itemize}
+        \item \textit{Interpretation}: The ultimate measure of user experience, directly correlated with MCS and PRB allocation.
+    \end{itemize}
+    \item \textbf{PRB Usage (Physical Resource Blocks)}: The percentage of time-frequency resources used.
+    \begin{itemize}
+        \item \textit{Interpretation}: Indicates cell load. High PRB usage with low throughput suggests spectral inefficiency (poor channel conditions).
+    \end{itemize}
+    \item \textbf{RLC Buffer Occupancy}: Data waiting in the queue.
+    \begin{itemize}
+        \item \textit{Interpretation}: High buffer occupancy implies the radio interface is the bottleneck (Congestion), often leading to increased latency.
+    \end{itemize}
+\end{itemize}
+
+% \begin{figure}[H]
+%     \centering
+%     \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.5cm}\textbf{[PLACEHOLDER: xApp Output]}\\\textit{Screenshot of terminal showing "KPM Indication received: ... "}\vspace{2.5cm}}}
+%     \caption{Real-time logs from the xApp during execution.}
+%     \label{fig:xapp_output}
+% \end{figure}
+
+\begin{terminaloutput}
+    (base) amine@amine-ad:/mnt/Studies/Sorbonne/CELL/xapp-monitoring$ kubectl exec -n blueprint oai-flexric-557fd6d789-g8c57 -- timeout 15 /flexric/build/examples/xApp/c/monitor/xapp_kpm_metrics_collector_v2 2>&1
+
+========================================
+  KPM Metrics Collector xApp v2.0
+  (MAC + RLC + PDCP + KPM Throughput)
+========================================
+Target: 1000 samples
+Output: /tmp/kpm_metrics_dataset.csv
+
+[UTIL]: Setting the config -c file to /usr/local/etc/flexric/flexric.conf
+[UTIL]: Setting path -p for the shared libraries to /usr/local/lib/flexric/
+[xAapp]: Initializing ... 
+[xApp]: nearRT-RIC IP Address = 10.244.0.11, PORT = 36422
+[E2 AGENT]: Opening plugin from path = /usr/local/lib/flexric/librlc_sm.so 
+[E2 AGENT]: Opening plugin from path = /usr/local/lib/flexric/librc_sm.so 
+[E2 AGENT]: Opening plugin from path = /usr/local/lib/flexric/libpdcp_sm.so 
+[E2 AGENT]: Opening plugin from path = /usr/local/lib/flexric/libkpm_sm.so 
+[E2 AGENT]: Opening plugin from path = /usr/local/lib/flexric/libmac_sm.so 
+[E2 AGENT]: Opening plugin from path = /usr/local/lib/flexric/libgtp_sm.so 
+[E2 AGENT]: Opening plugin from path = /usr/local/lib/flexric/libtc_sm.so 
+[E2 AGENT]: Opening plugin from path = /usr/local/lib/flexric/libslice_sm.so 
+[NEAR-RIC]: Loading SM ID = 143 with def = RLC_STATS_V0 
+[NEAR-RIC]: Loading SM ID = 3 with def = ORAN-E2SM-RC 
+[NEAR-RIC]: Loading SM ID = 144 with def = PDCP_STATS_V0 
+[NEAR-RIC]: Loading SM ID = 2 with def = ORAN-E2SM-KPM 
+[NEAR-RIC]: Loading SM ID = 142 with def = MAC_STATS_V0 
+[NEAR-RIC]: Loading SM ID = 148 with def = GTP_STATS_V0 
+[NEAR-RIC]: Loading SM ID = 146 with def = TC_STATS_V0 
+[NEAR-RIC]: Loading SM ID = 145 with def = SLICE_STATS_V0 
+[xApp]: DB filename = /tmp/xapp_db_1768181362051446 
+ [xApp]: E42 SETUP-REQUEST tx
+[xApp]: E42 SETUP-RESPONSE rx 
+[xApp]: xApp ID = 14 
+[xApp]: Registered E2 Nodes = 1 
+Connected E2 nodes: 1
+Node 0 RAN Functions: 2 3 142 143 144 145 146 148 
+[xApp]: E42 RIC SUBSCRIPTION REQUEST tx RAN_FUNC_ID 142 RIC_REQ_ID 1 
+[xApp]: SUBSCRIPTION RESPONSE rx
+[xApp]: Successfully subscribed to RAN_FUNC_ID 142 
+  MAC (142): OK
+[xApp]: E42 RIC SUBSCRIPTION REQUEST tx RAN_FUNC_ID 143 RIC_REQ_ID 2 
+[xApp]: SUBSCRIPTION RESPONSE rx
+[xApp]: Successfully subscribed to RAN_FUNC_ID 143 
+  RLC (143): OK
+[xApp]: E42 RIC SUBSCRIPTION REQUEST tx RAN_FUNC_ID 144 RIC_REQ_ID 3 
+[xApp]: SUBSCRIPTION RESPONSE rx
+[xApp]: Successfully subscribed to RAN_FUNC_ID 144 
+  PDCP (144): OK
+[xApp]: E42 RIC SUBSCRIPTION REQUEST tx RAN_FUNC_ID 148 RIC_REQ_ID 4 
+[xApp]: SUBSCRIPTION RESPONSE rx
+[xApp]: Successfully subscribed to RAN_FUNC_ID 148 
+  GTP (148): OK
+[xApp]: E42 RIC SUBSCRIPTION REQUEST tx RAN_FUNC_ID 2 RIC_REQ_ID 5 
+[xApp]: SUBSCRIPTION RESPONSE rx
+[xApp]: Successfully subscribed to RAN_FUNC_ID 2 
+  KPM (2): OK
+
+Collecting metrics...
+
+[100] SNR=51.0dB BLER=0.000 MCS=9 DL_Thp=0.0kbps UL_Thp=0.0kbps PRB=286270/286447
+[200] SNR=51.0dB BLER=0.000 MCS=9 DL_Thp=0.0kbps UL_Thp=0.0kbps PRB=286350/286527
+[300] SNR=51.0dB BLER=0.000 MCS=9 DL_Thp=0.0kbps UL_Thp=0.0kbps PRB=286440/286622
+[400] SNR=51.0dB BLER=0.000 MCS=9 DL_Thp=0.0kbps UL_Thp=0.0kbps PRB=286510/286687
+[500] SNR=51.0dB BLER=0.000 MCS=9 DL_Thp=0.0kbps UL_Thp=0.0kbps PRB=286560/286742
+[600] SNR=51.0dB BLER=0.000 MCS=9 DL_Thp=0.0kbps UL_Thp=0.0kbps PRB=286655/286832
+[700] SNR=51.0dB BLER=0.000 MCS=9 DL_Thp=0.0kbps UL_Thp=0.0kbps PRB=286745/286922
+[800] SNR=51.0dB BLER=0.000 MCS=9 DL_Thp=0.0kbps UL_Thp=0.0kbps PRB=286820/287002
+[900] SNR=51.0dB BLER=0.000 MCS=9 DL_Thp=0.0kbps UL_Thp=0.0kbps PRB=286915/287092
+[1000] SNR=51.0dB BLER=0.000 MCS=9 DL_Thp=0.0kbps UL_Thp=0.0kbps PRB=287005/287182
+
+Reached target of 1000 samples
+
+Stopping...
+[xApp]: E42 RIC_SUBSCRIPTION_DELETE_REQUEST tx RAN_FUNC_ID 142 RIC_REQ_ID 1 
+[xApp]: E42 SUBSCRIPTION DELETE RESPONSE rx
+[xApp]: E42 RIC_SUBSCRIPTION_DELETE_REQUEST tx RAN_FUNC_ID 143 RIC_REQ_ID 2 
+[xApp]: E42 SUBSCRIPTION DELETE RESPONSE rx
+[xApp]: E42 RIC_SUBSCRIPTION_DELETE_REQUEST tx RAN_FUNC_ID 144 RIC_REQ_ID 3 
+[xApp]: E42 SUBSCRIPTION DELETE RESPONSE rx
+[xApp]: E42 RIC_SUBSCRIPTION_DELETE_REQUEST tx RAN_FUNC_ID 148 RIC_REQ_ID 4 
+[xApp]: E42 SUBSCRIPTION DELETE RESPONSE rx
+[xApp]: E42 RIC_SUBSCRIPTION_DELETE_REQUEST tx RAN_FUNC_ID 2 RIC_REQ_ID 5 
+[xApp]: E42 SUBSCRIPTION DELETE RESPONSE rx
+
+========================================
+  Collection Complete
+  Samples: 1000
+  Output: /tmp/kpm_metrics_dataset.csv
+========================================
+
+[xApp]: Sucessfully stopped 
+\end{terminaloutput}

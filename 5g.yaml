@@ -3,9 +3,9 @@
   hosts: masters[0]
   become: no
   vars:
-    kubeconfig_path: "/home/amine/.kube/config"
+    kubeconfig_path: "/home/rxxxf/.kube/config"
   environment:
     PATH: "{{ansible_env.PATH }}:/usr/local/bin/"
-    KUBECONFIG: "/home/amine/.kube/config"
+    KUBECONFIG: "/home/rxxxf/.kube/config"
   roles:
     - role: 5g

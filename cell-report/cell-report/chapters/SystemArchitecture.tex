@@ -1,0 +1,46 @@
+\chapter{System Architecture}
+\label{chap:architecture}
+
+\section{Overview}
+The experimental platform is built on a cloud-native architecture connecting the 5G Core, RAN, and RIC.
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1 \linewidth]{architecture.png}
+    \caption{End-to-end 5G system architecture with O-RAN monitoring.}
+    \label{fig:high_level_arch}
+\end{figure}
+% \begin{figure}[H]
+%     \centering
+%     \fbox{\parbox{0.9\textwidth}{\centering\vspace{3cm}\textbf{[PLACEHOLDER: Architecture Diagram]}\\\textit{End-to-end architecture: 5GC(SBA) - gNB(E2) - FlexRIC}\vspace{3cm}}}
+%     \caption{End-to-end 5G system architecture with O-RAN monitoring.}
+%     \label{fig:high_level_arch}
+% \end{figure}
+
+\section{Components}
+
+\subsection{5G Core Network (OAI CN5G)}
+The core network manages connectivity and mobility. We use OAI CN5G Federation v1.5.1, deployed as microservices:
+\begin{itemize}
+    \item \textbf{AMF}: Access and Mobility Management.
+    \item \textbf{SMF/UPF}: Session management and user plane forwarding.
+    \item \textbf{UDM/UDR/AUSF}: Subscriber data and authentication.
+    \item \textbf{NRF}: Network function discovery.
+\end{itemize}
+
+\subsection{5G RAN (OAI gNB \& UE)}
+The Radio Access Network simulates the air interface:
+\begin{itemize}
+    \item \textbf{gNodeB}: Functions as the base station. Configured in \textbf{RF Simulator (RFSIM)} mode (n78 band, 40MHz BW) to avoid hardware dependency.
+    \item \textbf{NR-UE}: Simulates a 5G user equipment.
+    \item \textbf{E2 Agent}: An integrated agent in the gNB that exposes RAN metrics to the RIC via the E2 interface.
+\end{itemize}
+
+\subsection{Near-RT RIC (FlexRIC)}
+FlexRIC serves as the controller and monitoring hub:
+\begin{itemize}
+    \item \textbf{E2 Termination}: Connects to gNBs via SCTP.
+    \item \textbf{xApp/iApp Support}: Runs custom applications (like our KPM Monitor).
+    \item \textbf{Service Models (SM)}: Supports KPM, MAC, RLC, PDCP, and GTP service models for granular data access.
+\end{itemize}

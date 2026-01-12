@@ -1,0 +1,21 @@
+\chapter{Conclusion}
+\label{chap:conclusion}
+
+This project successfully demonstrated how to build and monitor a 5G network using open-source tools. We deployed the full OAI stack on Kubernetes and wrote a custom xApp that collects real-time data from the radio network.
+
+\section{Key Achievements}
+\begin{itemize}
+    \item \textbf{Infrastructure}: We got the 5G Core and gNodeB running on Minikube.
+    \item \textbf{Integration}: We connected FlexRIC to the gNodeB using the E2 interface.
+    \item \textbf{Monitoring}: Our xApp successfully records 41 different metrics (like throughput and signal quality) 100 times per second.
+\end{itemize}
+
+\section{Future Work}
+In the future, we could improve this by:
+\begin{enumerate}
+    \item Testing with real radio hardware (USRP) instead of simulation.
+    \item Adding more UEs to generate complex traffic patterns.
+    \item Using the collected data to train a Machine Learning model for network optimization.
+\end{enumerate}
+
+Overall, this project provided hands-on experience with 5G architecture and O-RAN concepts.

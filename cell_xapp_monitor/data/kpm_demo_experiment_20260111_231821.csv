@@ -1,1 +1,0 @@
-timestamp,sample_id,ue_id,pdcp_dl_kb,pdcp_ul_kb,rlc_delay_us,thp_dl_kbps,thp_ul_kbps,prb_dl,prb_ul,phase

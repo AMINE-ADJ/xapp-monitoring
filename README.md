@@ -1,175 +1,104 @@
-# xApp for Monitoring
+# 5G/KPM xApp Experimentation Platform
 
-## Contact
+This project implements a complete 5G experimentation platform using OAI (OpenAirInterface) and FlexRIC, designed for developing and monitoring KPM (Key Performance Metric) xApps.
 
-For help and information regarding this project, please contact: Dimitrios.Kefalas@lip6.fr
+## Project Overview
 
-## Overview
+The system deploys a full 5G network (Core, RAN, UE) and a Near-RT RIC (FlexRIC) on a Kubernetes cluster (Minikube). It includes a custom xApp for monitoring real-time network metrics.
 
-In this project, you are tasked with deploying a fully operational 5G network with a RIC using OpenAirInterface (OAI) and Kubernetes. By utilizing Kubernetes, the different network functions will run as independent Docker containers within a microservices environment provided by Kubernetes. 
+### Components
 
-The goal of the project is to develop and deploy an xApp that leverages the KPM (Key Performance Measurement) service model within FlexRIC to monitor and analyze various performance metrics in a cloud-based 5G environment. The project involves executing experiments to collect performance data and build a corresponding dataset.
+- **OAI 5G Core**: AMF, SMF, UPF, NRF, UDM, UDR, AUSF, MySQL.
+- **FlexRIC**: Near-RT RIC with E2 interface support.
+- **OAI gNB**: 5G Base Station (simulated RF).
+- **OAI NR-UE**: 5G User Equipment (simulated).
+- **KPM xApp**: Custom xApp for metric collection.
 
----
+## Quick Start
 
-## Objective
-- Utilize the KPM service model within FlexRIC to monitor and observe different KPM metrics.
-- Execute multiple experiments and create a dataset with the corresponding metrics.
+### 1. Prerequisite
+- Linux OS (Ubuntu/Arch/Fedora)
+- Minikube & Docker
+- Ansible (for deployment orchestration)
 
----
-
-## Tools & Software
-- Kubernetes
-- OpenAirInterface5G CN and RAN
-- FlexRIC (cloud-based)
-
----
-This repo uses a subpart of this implementation, please refer in case you need more details:
-```bash
-https://gitlab.noc.onelab.eu/onelab/slices-5g-blueprint/-/blob/main/5G_deployment_revised.md
-```
----
-
-## Getting Started
-
-### Step 1: Clone the Repository
-Clone the repository to your VMs.
-```bash
-git clone https://gitlab.noc.onelab.eu/dkefalas/xapp-monitoring.git
-```
----
-
-### Step 2: Verify Your Kubernetes Environment
-Check if you already have a healthy Kubernetes environment:
-
-- If your Kubernetes setup is functional, proceed to the Ansible installation section.
-- If you do not have a healthy Kubernetes environment, move to the next step.
-
----
-
-### Step 3: Setting Up Kubernetes
-Navigate to the `kubernetes-setup` folder in the repository.
-
-This folder contains Ansible playbooks for:
-- Uninstalling any existing Kubernetes setup.
-- Installing a fresh Kubernetes environment.
-- Setting up a cluster, including:
-  - The control plane node.
-  - Worker nodes that will join the cluster.
-
-Follow the instructions in the `kubernetes-setup` folder to set up your Kubernetes environment.
-
----
-
-### Step 4: Proceed to Ansible Installation
-Once your Kubernetes environment is set up, you can proceed with the installation using the provided Ansible playbooks.
-
-Begin by updating the inventories/UTH/hosts.yml file with the correct IPs and node names corresponding to your VMs.
-
-Next, modify the inventories/UTH/group_vars/all file to include the appropriate ansible_user value.
-
-After completing these steps, you can proceed with deploying the scenario by executing the following command:
-```bash
-ansible-playbook -i inventories/UTH 5g.yaml --extra-vars "@params.oai-flexric.yaml"
-```
-If everything has been set up correctly, all the following pods should be deployed:
-```bash
-kubectl get pods -n blueprint
-NAME                              READY   STATUS    RESTARTS   AGE
-oai-amf-6486c9d49c-snnt5          1/1     Running   0          45m
-oai-ausf-84ffb6bc7c-vjzdj         1/1     Running   0          45m
-oai-core-mysql-7f7b695b8b-s4l66   1/1     Running   0          45m
-oai-flexric-5db68d7bf6-n28q8      1/1     Running   0          44m
-oai-gnb-c5b4659c6-vghc7           1/1     Running   0          44m
-oai-nr-ue-7dbdb954fc-4rbn4        1/1     Running   0          44m
-oai-nrf-7dbb6d4b9-s9l2v           1/1     Running   0          45m
-oai-smf-5d654698cf-7wpnh          1/1     Running   0          45m
-oai-udm-7c49dc8f66-wsrtf          1/1     Running   0          45m
-oai-udr-5d85996695-zg5g4          1/1     Running   0          45m
-oai-upf-86dc5998c8-spzxz          1/1     Running   0          45m
-```
-
-
-
-
-At this point, you should be able to ping from your UE to the 5GCN. To do this, execute a command to ping the 5GCN from your UE. 
-```bash
-kubectl exec -ti oai-nr-ue-7dbdb954fc-4rbn4 -n blueprint -- ping 12.1.1.1
-```
-
-
-**Note**: The pod name in the command above is an example and will likely differ in your setup. Use `kubectl get pods` to find the correct pod name.
-
----
-
-## Deploying a Monitoring xApp
-
-The next step is to create and deploy a monitoring xApp. To deploy your xApp, run the following commands on the deployment host (master):
-```bash
-kubectl exec -ti oai-flexric-5db68d7bf6-n28q8 bash -n blueprint
-```
-
-This will connect you to the RIC environment, where you can choose the programming language for your xApp (C or Python3):
-
-- For **C language**: Navigate to `/flexric/build/examples/xApp/c`
-- For **Python3**: Navigate to `/flexric/build/examples/xApp/python3`
-
-**Example**: To run an xApp that monitors KPM metrics for the RAN, use the following command:
+### 2. Deploy Network
+To deploy the entire 5G infrastructure (fresh start):
 
 ```bash
-./xapp_kpm_moni
+./start_5g.sh
 ```
 
-## Configuration Files and Directories
+This script will:
+1. Start/Check Minikube.
+2. Clean up any stale deployments.
+3. specific Ansible playbook to deploy all components in the correct order.
 
-You can view or edit configuration files for the Core, RAN, FlexRIC, and UE in the following directories:
+_Deployment takes approximately 3-5 minutes._
 
-- **Core Files**:  
-  `roles/flexric/files/blueprint/oai-flexric/core_files`
-
-- **Core Configurations**:  
-  `roles/flexric/files/blueprint/oai-flexric/core_values`
-
-- **RAN Files**:  
-  `roles/flexric/files/blueprint/oai-flexric/ran_files`
-
-- **RAN Configurations**:  
-  `roles/flexric/files/blueprint/oai-flexric/ran_values`
-
-- **FlexRIC Files**:  
-  `roles/flexric/files/blueprint/oai-flexric/flexric_files`
-
-- **FlexRIC Configurations**:  
-  `roles/flexric/files/blueprint/oai-flexric/flexric_values`
-
-- **UE Files**:  
-  `roles/flexric/files/blueprint/oai-flexric/ue_files`
-
-- **UE Configurations**:  
-  `roles/flexric/files/blueprint/oai-flexric/ue_values`
-
----
-
-## Uninstalling the Previous Deployment
-
-To uninstall the previous deployment (OAI Core, RF Simulator, FlexRIC, and UE), run the following Ansible playbook:
+### 3. Verify Deployment
+Check the status of the pods:
 
 ```bash
-ansible-playbook -i inventories/UTH destroy-oai-flexric.yaml
+kubectl get pods -n blueprint -w
+```
+Wait until all pods (Core, gNB, UE, FlexRIC) are in `Running` state.
+
+## Data Collection
+
+To generate traffic (iperf3) and collect KPM metrics:
+
+```bash
+./start-collection.sh <duration_in_seconds> <bandwidth>
 ```
 
-This playbook will cleanly remove all components of the blueprint deployment.
+**Example:** Run for 60 seconds with 20Mbps traffic:
+```bash
+./start-collection.sh 60 20M
+```
 
----
+This script handles:
+1. Verifying UPF and UE connectivity.
+2. Auto-installing `iperf3` on the UPF if missing.
+3. Starting the xApp monitor.
+4. Generating traffic from UE -> UPF.
+5. Saving results to `cell_xapp_monitor/data/`.
 
-## Project Goals
-The primary goal of this project is to develop and deploy an xApp that:
-- Leverages the KPM service model within FlexRIC.
-- Monitors and observes various performance metrics in a cloud-based 5G environment.
-- Collects data through experiments and creates a dataset for further analysis.
+## Architecture
 
-This project uses:
-- Kubernetes for orchestration.
-- OpenAirInterface5G for Core Network (CN) and Radio Access Network (RAN).
-- FlexRIC for RIC-based monitoring and control.
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Minikube                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                   5G Core Network                    │   │
+│  │  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐   │   │
+│  │  │ NRF │ │ AMF │ │ SMF │ │ UPF │ │ UDM │ │ UDR │   │   │
+│  │  └─────┘ └──┬──┘ └──┬──┘ └──┬──┘ └─────┘ └─────┘   │   │
+│  └─────────────┼───────┼───────┼─────────────────────────┘   │
+│                │       │       │                            │
+│  ┌─────────────┼───────┼───────┼─────────────────────────┐   │
+│  │             │    FlexRIC    │                         │   │
+│  │        ┌────┴───────┴───────┴────┐                    │   │
+│  │        │      Near-RT RIC        │◄──── xApps        │   │
+│  │        └────────────┬────────────┘                    │   │
+│  │                     │ E2                                 │
+│  └─────────────────────┼─────────────────────────────────┘   │
+│                        │                                    │
+│  ┌─────────────────────┼─────────────────────────────────┐   │
+│  │              ┌──────▼───┐                             │   │
+│  │              │   gNB    │ (RF Simulator)              │   │
+│  │              └────┬─────┘                             │   │
+│  │                   │                                   │   │
+│  │              ┌────▼─────┐                             │   │
+│  │              │    UE    │ (IP: 12.1.1.2)              │   │
+│  │              └──────────┘                             │   │
+│  └───────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
 
+## Directory Structure
+
+- `start_5g.sh`: Main deployment script.
+- `start-collection.sh`: Traffic generation and data collection script.
+- `roles/`: Ansible roles for component deployment.
+- `inventories/`: Ansible inventory configurations.
+- `cell_xapp_monitor/`: Python scripts for xApp monitoring and data storage.
