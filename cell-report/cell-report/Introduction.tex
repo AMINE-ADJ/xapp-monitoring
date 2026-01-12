@@ -15,7 +15,7 @@ The primary goals of this project are:
 \end{enumerate}
 
 \section{Infrastructure Stabilization \& Verification}
-During the deployment phase, critical stability issues affecting the 5G Core Network were resolved. Specifically, the \texttt{oai-core} database (MySQL) initially exhibited persistent crash loops due to initialization race conditions. This was addressed by refining the deployment configuration to ensure robust volume persistence and correct initialization sequences, stabilizing the entire Core Network.
+During the deployment phase, a critical configuration issue affecting the 5G Core Network was identified and resolved. The \texttt{oai-core} database (MySQL) contained incorrect IMSI (International Mobile Subscriber Identity) entries in its provisioning tables. This mismatch prevented the simulated User Equipment (UE) from successfully authenticating and registering with the core. The issue was resolved by correcting the SQL initialization scripts to match the specific IMSQs and security keys used by the simulated UE, ensuring successful attachment.
 
 Following stabilization, end-to-end connectivity was verified. Successful ICMP (Ping) tests were executed between the simulated User Equipment (UE) and the External Data Network (via the UPF), validating the successful establishment of PDU sessions and the integrity of the GTP-U tunneling.
 
