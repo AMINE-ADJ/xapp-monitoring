@@ -1,0 +1,283 @@
+\chapter{xApp Implementation for KPM Data Collection}
+\label{chap:xapp}
+
+This chapter presents the design and implementation of a custom xApp for comprehensive Key Performance Metric (KPM) data collection from the 5G RAN. The xApp interfaces with FlexRIC using the E2 Application Protocol and Service Models to subscribe to and collect real-time metrics from the gNodeB.
+
+\section{xApp Architecture}
+
+The KPM Data Collector xApp is implemented in C to leverage the native FlexRIC SDK and achieve optimal performance for high-frequency data collection. The architecture follows the standard xApp design pattern within the O-RAN framework.
+
+\subsection{Component Overview}
+
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width=0.8\textwidth]{figures/xapp_architecture.png}
+    \fbox{\parbox{0.75\textwidth}{\centering\vspace{3cm}\textbf{[PLACEHOLDER: xApp Architecture Diagram]}\\\textit{Insert diagram showing xApp components and data flow}\vspace{3cm}}}
+    \caption{KPM Data Collector xApp internal architecture.}
+    \label{fig:xapp_arch}
+\end{figure}
+
+The xApp consists of the following components:
+
+\begin{itemize}
+    \item \textbf{E2 Interface Handler}: Manages connection to FlexRIC and E2AP message processing
+    \item \textbf{Service Model Callbacks}: Handles indication messages from MAC, RLC, PDCP, GTP, and KPM Service Models
+    \item \textbf{Data Aggregator}: Correlates metrics from multiple Service Models into unified records
+    \item \textbf{CSV Writer}: Persists collected metrics to disk in CSV format for analysis
+\end{itemize}
+
+\section{FlexRIC SDK Integration}
+
+The xApp utilizes the FlexRIC C SDK to interface with the near-RT RIC. The SDK provides APIs for E2 connection management, Service Model subscription, and indication handling.
+
+\subsection{Initialization and Connection}
+
+\begin{codeblock}[language=c]{xApp Initialization}
+// Initialize FlexRIC arguments
+fr_args_t args = init_fr_args(argc, argv);
+
+// Initialize the E2 Agent connection
+init_e2_agent_api(
+    args.ip,          // FlexRIC IP address
+    args.port,        // E2 port (default: 36421)
+    args.plmn,        // PLMN configuration
+    "KPM_Collector"   // xApp identifier
+);
+
+// Retrieve connected E2 Nodes
+e2_node_arr_t e2_nodes = e2_nodes_connected();
+\end{codeblock}
+
+\subsection{Service Model Subscription}
+
+The xApp subscribes to multiple Service Models to collect comprehensive metrics:
+
+\begin{codeblock}[language=c]{Service Model Subscriptions}
+// Subscribe to MAC Service Model
+mac_sub_handle = report_mac_sm(
+    e2_node_id,
+    100,           // Reporting period (ms)
+    sm_cb_mac      // Callback function
+);
+
+// Subscribe to RLC Service Model
+rlc_sub_handle = report_rlc_sm(
+    e2_node_id,
+    100,
+    sm_cb_rlc
+);
+
+// Subscribe to PDCP Service Model
+pdcp_sub_handle = report_pdcp_sm(
+    e2_node_id,
+    100,
+    sm_cb_pdcp
+);
+
+// Subscribe to GTP Service Model
+gtp_sub_handle = report_gtp_sm(
+    e2_node_id,
+    100,
+    sm_cb_gtp
+);
+
+// Subscribe to KPM Service Model for throughput
+kpm_sub_handle = report_kpm_sm(
+    e2_node_id,
+    100,
+    sm_cb_kpm,
+    gen_kpm_action_def()  // Action definition
+);
+\end{codeblock}
+
+\section{Service Model Callback Implementation}
+
+Each Service Model subscription triggers periodic indication messages containing current metric values. The xApp implements callback functions to process these indications.
+
+\subsection{MAC Service Model Callback}
+
+The MAC callback extracts PHY layer and scheduling metrics:
+
+\begin{codeblock}[language=c]{MAC Callback Implementation}
+void sm_cb_mac(sm_ag_if_rd_t const* rd) {
+    assert(rd->type == MAC_STATS_V0);
+    mac_ind_data_t const* ind = &rd->mac_stats;
+    
+    for (size_t i = 0; i < ind->msg.len_ue_stats; i++) {
+        mac_ue_stats_impl_t const* ue = &ind->msg.ue_stats[i];
+        
+        // Extract DL metrics
+        current_record.dl_mcs1 = ue->dl_mcs1;
+        current_record.dl_mcs2 = ue->dl_mcs2;
+        current_record.dl_bler = ue->dl_bler;
+        current_record.dl_tbs = ue->dl_tbs;
+        current_record.dl_prb_used = ue->dl_num_prb;
+        
+        // Extract UL metrics
+        current_record.ul_mcs1 = ue->ul_mcs1;
+        current_record.ul_mcs2 = ue->ul_mcs2;
+        current_record.ul_bler = ue->ul_bler;
+        current_record.ul_tbs = ue->ul_tbs;
+        current_record.ul_prb_used = ue->ul_num_prb;
+        
+        // Signal quality indicators
+        current_record.pusch_snr = ue->pusch_snr;
+        current_record.pucch_snr = ue->pucch_snr;
+    }
+}
+\end{codeblock}
+
+\subsection{RLC Service Model Callback}
+
+The RLC callback captures Layer 2 statistics for both transmission modes:
+
+\begin{codeblock}[language=c]{RLC Callback Implementation}
+void sm_cb_rlc(sm_ag_if_rd_t const* rd) {
+    assert(rd->type == RLC_STATS_V0);
+    rlc_ind_data_t const* ind = &rd->rlc_stats;
+    
+    for (size_t i = 0; i < ind->msg.len; i++) {
+        rlc_radio_bearer_stats_t const* rb = &ind->msg.rb[i];
+        
+        if (rb->mode == RLC_AM_MODE) {
+            current_record.rlc_txpdu_pkts = rb->txpdu_pkts;
+            current_record.rlc_txpdu_bytes = rb->txpdu_bytes;
+            current_record.rlc_rxpdu_pkts = rb->rxpdu_pkts;
+            current_record.rlc_rxpdu_bytes = rb->rxpdu_bytes;
+            current_record.rlc_retx = rb->txpdu_retx_pkts;
+        }
+    }
+}
+\end{codeblock}
+
+\subsection{KPM Service Model Callback}
+
+The KPM Service Model provides standardized O-RAN metrics including throughput measurements:
+
+\begin{codeblock}[language=c]{KPM Callback Implementation}
+void sm_cb_kpm(sm_ag_if_rd_t const* rd) {
+    assert(rd->type == KPM_STATS_V0);
+    kpm_ind_data_t const* ind = &rd->kpm_stats;
+    
+    // Process measurement data
+    meas_data_lst_t const* meas = &ind->msg.meas_data;
+    
+    for (size_t i = 0; i < meas->len; i++) {
+        meas_record_lst_t const* rec = &meas->record[i];
+        
+        // Extract throughput measurements
+        if (rec->type == DRB_PDCP_SDU_VOLUME_DL) {
+            current_record.dl_throughput = rec->value;
+        }
+        if (rec->type == DRB_PDCP_SDU_VOLUME_UL) {
+            current_record.ul_throughput = rec->value;
+        }
+    }
+}
+\end{codeblock}
+
+\section{Data Collection and Storage}
+
+The xApp aggregates metrics from all Service Models and writes complete records to a CSV file for subsequent analysis.
+
+\subsection{Record Structure}
+
+\begin{table}[H]
+\centering
+\caption{Collected metric categories}
+\label{tab:metric_categories}
+\begin{tabular}{|l|l|p{5cm}|}
+\hline
+\textbf{Category} & \textbf{Source SM} & \textbf{Metrics} \\
+\hline
+PHY Layer & MAC & PUSCH SNR, PUCCH SNR \\
+\hline
+Scheduling & MAC & MCS, TBS, PRB allocation, BLER \\
+\hline
+L2 Statistics & RLC & PDU counts, byte counts, retransmissions \\
+\hline
+PDCP & PDCP & SDU volumes, HFN, SN \\
+\hline
+User Plane & GTP & QFI, TEID, byte counts \\
+\hline
+Throughput & KPM & DL/UL throughput measurements \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{CSV Output Format}
+
+The xApp generates CSV files with the following structure:
+
+\begin{codeblock}[language=text]{CSV Header Structure}
+timestamp,rnti,frame,slot,
+dl_mcs1,dl_mcs2,dl_bler,dl_tbs,dl_prb_used,dl_prb_total,
+ul_mcs1,ul_mcs2,ul_bler,ul_tbs,ul_prb_used,ul_prb_total,
+pusch_snr,pucch_snr,
+rlc_txpdu_pkts,rlc_txpdu_bytes,rlc_rxpdu_pkts,rlc_rxpdu_bytes,
+rlc_retx,
+pdcp_tx_pkts,pdcp_tx_bytes,pdcp_rx_pkts,pdcp_rx_bytes,
+gtp_teid,gtp_qfi,gtp_dl_bytes,gtp_ul_bytes,
+kpm_dl_throughput,kpm_ul_throughput
+\end{codeblock}
+
+\section{Compilation and Execution}
+
+The xApp is compiled against the FlexRIC libraries and executed within the FlexRIC pod.
+
+\subsection{Build Process}
+
+\begin{codeblock}[language=bash]{xApp Compilation}
+# Compile with FlexRIC includes and libraries
+gcc -O2 -Wall \
+    -I/usr/local/share/flexric/include \
+    -L/usr/local/share/flexric/lib \
+    xapp_kpm_metrics_collector.c \
+    -o xapp_kpm_collector \
+    -le2_api -lsm_mac -lsm_rlc -lsm_pdcp -lsm_gtp -lsm_kpm \
+    -pthread
+\end{codeblock}
+
+\subsection{Execution}
+
+\begin{codeblock}[language=bash]{xApp Execution}
+# Run within FlexRIC pod
+kubectl exec -it oai-flexric -n blueprint -- \
+    /xapp_kpm_collector \
+    -c /etc/flexric/flexric.conf \
+    -o /data/kpm_dataset.csv \
+    -n 1000
+\end{codeblock}
+
+\section{Data Collection Results}
+
+The xApp successfully collects comprehensive metrics at a rate of 100 samples per second. A representative dataset of 1000 samples demonstrates the system's capability.
+
+\begin{table}[H]
+\centering
+\caption{Data collection summary}
+\label{tab:collection_summary}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Parameter} & \textbf{Value} \\
+\hline
+Sample Rate & 100 Hz (10ms period) \\
+\hline
+Total Features & 41 metrics per sample \\
+\hline
+Collection Duration & 10 seconds (1000 samples) \\
+\hline
+Service Models Used & MAC, RLC, PDCP, GTP, KPM \\
+\hline
+Data Format & CSV \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width=0.9\textwidth]{figures/xapp_output.png}
+    \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.5cm}\textbf{[PLACEHOLDER: xApp Execution Output]}\\\textit{Insert screenshot of xApp console output during data collection}\vspace{2.5cm}}}
+    \caption{xApp runtime output showing subscription confirmations and data collection progress.}
+    \label{fig:xapp_output}
+\end{figure}

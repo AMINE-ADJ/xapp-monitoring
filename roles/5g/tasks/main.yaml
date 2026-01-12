@@ -1,12 +1,10 @@
 ---
-
 - name: Retrieve OAI
   ansible.builtin.git:
     repo: https://github.com/teo-tsou/oai-flexric.git
     dest: bp-flexric
     version: master
     force: yes
-  become: yes
 
     #- name: Ensure pip3 is installed
     #ansible.builtin.apt:
@@ -38,7 +36,7 @@
   ansible.builtin.get_url:
     url: "https://get.helm.sh/helm-v3.7.0-linux-amd64.tar.gz"
     dest: "/tmp/helm-v3.7.0-linux-amd64.tar.gz"
-    mode: '0644'
+    mode: "0644"
   when: helm_check.rc != 0
 
 - name: Extract Helm tar.gz
@@ -74,30 +72,29 @@
 
 - name: Create blueprint namespace
   kubernetes.core.k8s:
-    name: '{{ GCN.namespace }}'
+    name: "{{ GCN.namespace }}"
     api_version: v1
     kind: Namespace
     state: present
-    kubeconfig: /etc/kubernetes/admin.conf
-  become: yes
+    kubeconfig: "{{ kubeconfig_path }}"
 
 # The tasks for setting up the 5G core, FlexRIC, RAN, and UEs
 - name: Setup 5G core
-  ansible.builtin.include_tasks: 'core.yaml'
+  ansible.builtin.include_tasks: "core.yaml"
   when: GCN.core.present is defined and GCN.core.present
 
 - name: Fetch status of core pods
   kubernetes.core.k8s_info:
     kind: Pod
-    kubeconfig: /etc/kubernetes/admin.conf
-    namespace: '{{ GCN.namespace }}'
+    kubeconfig: "{{ kubeconfig_path }}"
+    namespace: "{{ GCN.namespace }}"
     label_selectors:
-      - "app.kubernetes.io/instance=oai-core"  # Adjust this to match your pods' labeling
+      - "app.kubernetes.io/instance=oai-core" # Adjust this to match your pods' labeling
   register: pod_info
 
 - name: Verify all the core pods and their containers are ready
   ansible.builtin.command:
-    cmd: "kubectl get pods --kubeconfig /etc/kubernetes/admin.conf --namespace {{ GCN.namespace }} -l app.kubernetes.io/instance=oai-core -o jsonpath='{.items[*].status.conditions[?(@.type==\"Ready\")].status}'"
+    cmd: 'kubectl get pods --kubeconfig {{ kubeconfig_path }} --namespace {{ GCN.namespace }} -l app.kubernetes.io/instance=oai-core -o jsonpath=''{.items[*].status.conditions[?(@.type=="Ready")].status}'''
   register: pod_ready_status
   until: pod_ready_status.stdout.split() | select("equalto", "True") | list | length == pod_info.resources | length
   retries: 30
@@ -105,14 +102,13 @@
   when: GCN.core.present is defined and GCN.core.present
 
 - name: Setup FlexRIC
-  ansible.builtin.include_tasks: 'flexric.yaml'
+  ansible.builtin.include_tasks: "flexric.yaml"
   when: GCN.flexRIC.present is defined and GCN.flexRIC.present
 
 - name: Setup RAN
-  ansible.builtin.include_tasks: 'ran.yaml'
+  ansible.builtin.include_tasks: "ran.yaml"
   when: GCN.RAN.present is defined and GCN.RAN.present
 
 - name: Setup UEs
-  ansible.builtin.include_tasks: 'ue.yaml'
+  ansible.builtin.include_tasks: "ue.yaml"
   when: GCN.UE.present is defined and GCN.UE.present
-

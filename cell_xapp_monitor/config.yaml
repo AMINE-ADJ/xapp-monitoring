@@ -1,0 +1,81 @@
+# CELL xApp Monitor Configuration
+# KPM Service Model Data Collector for FlexRIC
+
+# Kubernetes settings
+kubernetes:
+  namespace: blueprint
+  flexric_label: app.kubernetes.io/name=oai-flexric
+  ue_label: app.kubernetes.io/name=oai-nr-ue
+  gnb_label: app.kubernetes.io/name=oai-gnb
+
+# FlexRIC xApp settings
+flexric:
+  xapp_binary: /flexric/build/examples/xApp/c/monitor/xapp_kpm_moni
+  reporting_period_ms: 1000
+  
+# KPM metrics to collect (3GPP TS 28.552)
+kpm_metrics:
+  # PDCP Layer Metrics
+  - name: DRB.PdcpSduVolumeDL
+    description: PDCP SDU Volume Downlink
+    unit: kb
+    type: integer
+  - name: DRB.PdcpSduVolumeUL
+    description: PDCP SDU Volume Uplink
+    unit: kb
+    type: integer
+    
+  # RLC Layer Metrics
+  - name: DRB.RlcSduDelayDl
+    description: RLC SDU Delay Downlink
+    unit: μs
+    type: real
+    
+  # Throughput Metrics
+  - name: DRB.UEThpDl
+    description: UE Throughput Downlink
+    unit: kbps
+    type: real
+  - name: DRB.UEThpUl
+    description: UE Throughput Uplink
+    unit: kbps
+    type: real
+    
+  # Radio Resource Metrics
+  - name: RRU.PrbTotDl
+    description: Total PRB Usage Downlink
+    unit: PRBs
+    type: integer
+  - name: RRU.PrbTotUl
+    description: Total PRB Usage Uplink
+    unit: PRBs
+    type: integer
+
+# Experiment settings
+experiment:
+  default_duration: 300  # seconds
+  phases:
+    - name: baseline
+      description: Idle network (no traffic)
+      duration_percent: 15
+    - name: ping
+      description: ICMP ping traffic
+      duration_percent: 15
+    - name: download
+      description: Downlink heavy traffic
+      duration_percent: 20
+    - name: upload
+      description: Uplink heavy traffic
+      duration_percent: 20
+    - name: bidirectional
+      description: Bidirectional traffic
+      duration_percent: 20
+    - name: cooldown
+      description: Post-experiment idle
+      duration_percent: 10
+
+# Output settings
+output:
+  directory: ./data
+  csv_format: kpm_dataset_{timestamp}.csv
+  include_raw_log: true

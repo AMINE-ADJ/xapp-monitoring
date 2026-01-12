@@ -1,0 +1,56 @@
+\chapter{Introduction}
+\label{chap:introduction}
+
+\section{Context and Motivation}
+
+The fifth generation (5G) of mobile networks represents a paradigm shift in telecommunications, enabling unprecedented data rates, ultra-low latency, and massive device connectivity. As 5G networks are deployed globally, the need for sophisticated monitoring and management tools becomes increasingly critical. Network operators and researchers require comprehensive visibility into network performance to ensure Quality of Service (QoS), optimize resource utilization, and rapidly identify anomalies.
+
+The Open Radio Access Network (O-RAN) architecture has emerged as a transformative approach to RAN design, promoting openness, intelligence, and flexibility. Central to the O-RAN architecture is the RAN Intelligent Controller (RIC), which enables data-driven optimization through programmable applications called xApps. These xApps can collect Key Performance Metrics (KPMs), analyze network behavior, and implement control actions to optimize network performance.
+
+OpenAirInterface (OAI) provides an open-source implementation of both 5G Core Network (5GC) and 5G RAN components, enabling researchers and developers to deploy complete 5G networks for experimentation. When combined with FlexRIC---an open-source near-Real-Time RIC implementation---OAI enables the development and testing of O-RAN-compliant monitoring and control applications.
+
+\section{Objectives}
+
+This work presents the design, implementation, and validation of a comprehensive 5G experimentation platform with integrated monitoring capabilities. The primary objectives are:
+
+\begin{enumerate}
+    \item \textbf{Platform Development}: Deploy a complete 5G network infrastructure including Core Network, RAN, and near-RT RIC components using containerization technologies.
+    
+    \item \textbf{O-RAN Integration}: Establish functional E2 interface connectivity between the gNodeB and FlexRIC for standardized RAN monitoring and control.
+    
+    \item \textbf{xApp Implementation}: Develop a custom xApp for comprehensive KPM data collection, leveraging multiple O-RAN Service Models.
+    
+    \item \textbf{Experimental Validation}: Collect and analyze RAN metrics to validate platform functionality and demonstrate monitoring capabilities.
+\end{enumerate}
+
+\section{Scope}
+
+The platform encompasses the following components and technologies:
+
+\begin{itemize}
+    \item \textbf{5G Core Network}: OAI CN5G Federation v1.5.1 with AMF, SMF, UPF, UDM, UDR, NRF, and AUSF network functions.
+    
+    \item \textbf{5G RAN}: OAI gNodeB with integrated E2 Agent operating in RF simulation (RFSIM) mode.
+    
+    \item \textbf{Near-RT RIC}: FlexRIC providing E2 termination and xApp runtime environment.
+    
+    \item \textbf{Service Models}: MAC, RLC, PDCP, GTP, and KPM Service Models for comprehensive metric collection.
+    
+    \item \textbf{Orchestration}: Kubernetes-based deployment for all platform components.
+\end{itemize}
+
+\section{Report Organization}
+
+This report is organized as follows:
+
+\begin{description}
+    \item[Chapter 2: System Architecture] presents the overall platform architecture, detailing the OAI 5G Core Network functions, RAN components, FlexRIC near-RT RIC, and their interconnections through standardized interfaces.
+    
+    \item[Chapter 3: Kubernetes-Based Deployment] describes the containerized deployment approach, including pod configurations, service definitions, and deployment automation.
+    
+    \item[Chapter 4: xApp Implementation] details the design and implementation of the KPM Data Collector xApp, covering FlexRIC SDK integration, Service Model subscriptions, and data collection mechanisms.
+    
+    \item[Chapter 5: Experimental Results] presents the collected dataset and statistical analysis of the gathered metrics, demonstrating the platform's monitoring capabilities.
+    
+    \item[Chapter 6: Conclusion] summarizes the contributions, discusses platform capabilities, and identifies directions for future work.
+\end{description}

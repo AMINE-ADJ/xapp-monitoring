@@ -1,8 +1,11 @@
 ---
 - name: Deploy 5G network
   hosts: masters[0]
-  become: yes
+  become: no
+  vars:
+    kubeconfig_path: "/home/amine/.kube/config"
   environment:
-    PATH: '{{ansible_env.PATH }}:/usr/local/bin/'
+    PATH: "{{ansible_env.PATH }}:/usr/local/bin/"
+    KUBECONFIG: "/home/amine/.kube/config"
   roles:
     - role: 5g

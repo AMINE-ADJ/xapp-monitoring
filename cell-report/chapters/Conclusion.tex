@@ -1,0 +1,109 @@
+\chapter{Conclusion}
+\label{chap:conclusion}
+
+This report has presented a comprehensive 5G experimentation platform integrating OpenAirInterface (OAI), FlexRIC, and a custom xApp for Key Performance Metric (KPM) data collection. The platform provides an end-to-end environment for 5G network research, monitoring, and optimization.
+
+\section{Summary of Contributions}
+
+\subsection{Platform Architecture}
+
+The developed platform successfully integrates:
+
+\begin{itemize}
+    \item \textbf{OAI 5G Core Network}: A complete 3GPP-compliant 5G Core with AMF, SMF, UPF, UDM, UDR, NRF, and AUSF network functions, supporting the 5G Service-Based Architecture and providing subscriber management, session handling, and user plane connectivity.
+    
+    \item \textbf{OAI 5G RAN}: A software-defined gNodeB operating in RFSIM mode with integrated E2 Agent for O-RAN compatibility, supporting the n78 frequency band with 40 MHz bandwidth and 30 kHz subcarrier spacing.
+    
+    \item \textbf{FlexRIC Near-RT RIC}: An O-RAN compliant near-Real-Time RIC providing the E2 interface for RAN control and monitoring, supporting multiple Service Models including MAC, RLC, PDCP, GTP, and KPM.
+    
+    \item \textbf{Kubernetes Orchestration}: A containerized deployment architecture enabling reproducible deployments, resource management, and simplified operations across all platform components.
+\end{itemize}
+
+\subsection{xApp Development}
+
+A custom xApp for KPM data collection was designed and implemented, featuring:
+
+\begin{itemize}
+    \item Native C implementation leveraging the FlexRIC SDK for optimal performance
+    \item Multi-Service Model subscription for comprehensive metric coverage
+    \item High-frequency data collection at 100 samples per second
+    \item Structured CSV output for integration with analysis tools
+    \item 41 distinct metrics spanning PHY, MAC, RLC, PDCP, GTP, and KPM layers
+\end{itemize}
+
+\subsection{Experimental Validation}
+
+The platform was validated through systematic data collection, demonstrating:
+
+\begin{itemize}
+    \item Successful E2 interface operation between gNB and FlexRIC
+    \item Reliable Service Model indication delivery
+    \item Consistent metric collection without data loss
+    \item Expected metric values and statistical properties
+\end{itemize}
+
+\section{Platform Capabilities}
+
+The developed platform enables various research and development activities:
+
+\begin{enumerate}
+    \item \textbf{RAN Monitoring}: Real-time visibility into radio interface performance through comprehensive KPM collection.
+    
+    \item \textbf{Algorithm Development}: A testbed for developing and evaluating scheduling, resource allocation, and optimization algorithms.
+    
+    \item \textbf{Machine Learning Applications}: High-quality datasets for training ML models for anomaly detection, traffic prediction, and network optimization.
+    
+    \item \textbf{Protocol Analysis}: Cross-layer visibility for protocol behavior analysis and troubleshooting.
+    
+    \item \textbf{Education and Training}: A complete 5G environment for educational purposes and hands-on learning.
+\end{enumerate}
+
+\section{Future Work}
+
+Several directions for future enhancement are identified:
+
+\subsection{Platform Extensions}
+
+\begin{itemize}
+    \item \textbf{Multi-UE Support}: Extend the platform to support multiple concurrent UEs for more realistic traffic scenarios.
+    
+    \item \textbf{Hardware Integration}: Transition from RFSIM to real RF hardware (USRP) for over-the-air experiments.
+    
+    \item \textbf{Core Network Monitoring}: Develop xApps for monitoring 5G Core network functions and N2/N4 interfaces.
+    
+    \item \textbf{Network Slicing}: Implement network slicing capabilities with per-slice monitoring and control.
+\end{itemize}
+
+\subsection{xApp Enhancements}
+
+\begin{itemize}
+    \item \textbf{Control Loop Implementation}: Extend the xApp to implement closed-loop control using the RC (RAN Control) Service Model.
+    
+    \item \textbf{Real-Time Analytics}: Integrate stream processing for real-time anomaly detection and alerting.
+    
+    \item \textbf{ML Model Integration}: Embed trained ML models for online inference and automated optimization.
+    
+    \item \textbf{Multi-Cell Support}: Scale the xApp to monitor multiple gNBs simultaneously.
+\end{itemize}
+
+\subsection{Research Directions}
+
+\begin{itemize}
+    \item \textbf{QoS Optimization}: Develop algorithms for dynamic QoS management based on collected metrics.
+    
+    \item \textbf{Energy Efficiency}: Investigate RAN energy consumption optimization through intelligent resource management.
+    
+    \item \textbf{Interference Management}: Implement coordinated multi-point techniques using FlexRIC control capabilities.
+\end{itemize}
+
+\section{Concluding Remarks}
+
+This work demonstrates the feasibility of building a complete, functional 5G experimentation platform using open-source components. The integration of OAI, FlexRIC, and Kubernetes provides a flexible and extensible foundation for 5G research. The developed KPM Data Collector xApp validates the platform's monitoring capabilities and provides valuable datasets for further analysis.
+
+The O-RAN architecture's separation of concerns---between RAN intelligence and radio protocol processing---enables modular development of intelligent network applications. The platform presented in this report serves as a reference implementation for researchers and practitioners working on next-generation mobile network optimization and automation.
+
+\vspace{1cm}
+
+\begin{center}
+\rule{0.5\textwidth}{0.4pt}
+\end{center}

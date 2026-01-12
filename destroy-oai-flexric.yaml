@@ -14,7 +14,7 @@
     - name: Uninstall Helm Releases
       shell: helm uninstall {{ item }} -n {{ namespace }}
       environment:
-       KUBECONFIG: "/etc/kubernetes/admin.conf"
+        KUBECONFIG: "{{ ansible_env.HOME }}/.kube/config"
       loop: "{{ helm_releases }}"
       register: helm_uninstall_output
       ignore_errors: yes

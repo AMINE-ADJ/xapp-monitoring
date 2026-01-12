@@ -1,0 +1,1 @@
+timestamp,sample_id,ue_id,pdcp_sdu_volume_dl_kb,pdcp_sdu_volume_ul_kb,rlc_sdu_delay_dl_us,ue_throughput_dl_kbps,ue_throughput_ul_kbps,prb_total_dl,prb_total_ul

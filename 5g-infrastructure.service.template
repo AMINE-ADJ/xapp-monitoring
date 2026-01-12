@@ -1,0 +1,19 @@
+[Unit]
+Description=5G Infrastructure Auto-Setup (OAI + FlexRIC)
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=%USER%
+Environment="HOME=/home/%USER%"
+Environment="PATH=/usr/local/bin:/usr/bin:/bin:/home/%USER%/.local/bin"
+ExecStart=/bin/bash %SCRIPT_PATH%/setup-5g-infrastructure.sh
+ExecStop=/usr/local/bin/minikube stop
+TimeoutStartSec=600
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
