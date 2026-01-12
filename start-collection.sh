@@ -115,23 +115,40 @@ LOG_FILE="$DATA_DIR/gnb_logs_${TIMESTAMP}.txt"
 FINAL_FILE="$DATA_DIR/dataset_full_${TIMESTAMP}.csv"
 
 # Start Log Capture
-echo "[INFO] Capturing gNB logs..."
+echo "[INFO] Capturing gNB and Core Network logs..."
 GNB_POD=$(kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=oai-gnb -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+AMF_POD=$(kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=oai-amf -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+SMF_POD=$(kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=oai-smf -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+# UPF_POD is already defined at start
+
+# Define CN Log Files
+LOG_AMF="$DATA_DIR/cn_logs_amf_${TIMESTAMP}.txt"
+LOG_SMF="$DATA_DIR/cn_logs_smf_${TIMESTAMP}.txt"
+LOG_UPF="$DATA_DIR/cn_logs_upf_${TIMESTAMP}.txt"
+
+# Start background captures
 kubectl logs -f -n $NAMESPACE $GNB_POD > "$LOG_FILE" 2>&1 &
-LOG_PID=$!
+PID_GNB=$!
+kubectl logs -f -n $NAMESPACE $AMF_POD > "$LOG_AMF" 2>&1 &
+PID_AMF=$!
+kubectl logs -f -n $NAMESPACE $SMF_POD > "$LOG_SMF" 2>&1 &
+PID_SMF=$!
+kubectl logs -f -n $NAMESPACE $UPF_POD > "$LOG_UPF" 2>&1 &
+PID_UPF=$!
 
 if kubectl cp "$NAMESPACE/$FLEXRIC_POD:/tmp/kpm_metrics_dataset.csv" "$LOCAL_FILE" 2>/dev/null; then
     ROWS=$(wc -l < "$LOCAL_FILE")
     echo "[SUCCESS] Data saved to: $LOCAL_FILE"
     echo "          Rows collected: $ROWS"
     
-    # Stop Log Capture
-    kill $LOG_PID 2>/dev/null || true
+    # Stop Log Captures
+    kill $PID_GNB $PID_AMF $PID_SMF $PID_UPF 2>/dev/null || true
     
     # Merge Data
     echo ""
-    echo "[INFO] Merging with gNB logs..."
-    python3 "$SCRIPT_DIR/merge_metrics.py" "$LOCAL_FILE" "$LOG_FILE" "$FINAL_FILE"
+    echo "[INFO] Merging with gNB and Core Network logs..."
+    # Pass all log files to the python script
+    python3 "$SCRIPT_DIR/merge_metrics.py" "$LOCAL_FILE" "$LOG_FILE" "$FINAL_FILE" "--amf" "$LOG_AMF" "--smf" "$LOG_SMF" "--upf" "$LOG_UPF"
     
     echo ""
     echo "Sample Data (Final):"

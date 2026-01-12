@@ -2,6 +2,8 @@ import pandas as pd
 import re
 import sys
 import os
+import argparse
+from datetime import datetime
 
 def parse_gnb_logs(log_file):
     """
@@ -98,8 +100,53 @@ def parse_gnb_logs(log_file):
     
     return metrics
 
-def merge_data(csv_file, log_file, output_file):
-    print(f"[INFO] Merging {csv_file} with metrics from {log_file}...")
+def parse_cn_logs(log_file, nf_type):
+    """
+    Parses CN logs (AMF, SMF, UPF).
+    Since we can't easily map exact timestamps to frames, we extract
+    GLOBAL STATES or EVENTS that occurred during the experiment.
+    
+    Returns a dict of summary stats or state.
+    """
+    stats = {}
+    if not log_file or not os.path.exists(log_file):
+        return stats
+        
+    try:
+        with open(log_file, 'r') as f:
+            content = f.read()
+            
+            if nf_type == 'AMF':
+                # Check for Registration
+                if "Registration request" in content:
+                    stats['amf_state'] = "Registering"
+                if "Registration accept" in content or "5GMM state: REGISTERED" in content:
+                    stats['amf_state'] = "Registered"
+                else:
+                    stats['amf_state'] = "Idle"
+                    
+                # Count Auth events
+                stats['amf_auth_events'] = content.count("Authentication request")
+                
+            elif nf_type == 'SMF':
+                # PDU Sessions
+                stats['smf_pdu_sessions'] = content.count("PDU Session Establishment Accept")
+                if "PDU Session Release" in content:
+                     stats['smf_pdu_status'] = "Released"
+                else:
+                     stats['smf_pdu_status'] = "Active" if stats['smf_pdu_sessions'] > 0 else "Inactive"
+
+            elif nf_type == 'UPF':
+                # UPF logs are often quiet, check for GTP
+                stats['upf_gtp_pkts'] = content.count("GTP-U")
+                
+    except Exception as e:
+        print(f"[WARN] Failed to read CN log {log_file}: {e}")
+        
+    return stats
+
+def merge_data(csv_file, log_file, output_file, amf_log=None, smf_log=None, upf_log=None):
+    print(f"[INFO] Merging {csv_file} with metrics from gNB and CN logs...")
     
     # 1. Load xApp CSV
     try:
@@ -108,17 +155,19 @@ def merge_data(csv_file, log_file, output_file):
         print(f"[ERROR] Could not read CSV: {e}")
         return
 
-    # 2. Parse Logs
+    # 2. Parse gNB Logs
     log_metrics = parse_gnb_logs(log_file)
-    print(f"[INFO] Extracted {len(log_metrics)} log data points.")
-
-    # 3. Merge with Lookback
-    # Logs are sparse (e.g. every 128 slots). xApp is frequent (every 10ms).
-    # Strategy: For CSV frame F, look for Log frame L in [F, F-1, ..., F-200].
-    # We ignore slot matching for now as RSRP changes slowly.
+    print(f"[INFO] Extracted {len(log_metrics)} gNB log data points.")
     
-    # Flatten log_metrics to just frame -> data
-    # (Choosing the last slot seen for a frame if multiple existence)
+    # 3. Parse CN Logs
+    amf_stats = parse_cn_logs(amf_log, 'AMF')
+    smf_stats = parse_cn_logs(smf_log, 'SMF')
+    upf_stats = parse_cn_logs(upf_log, 'UPF')
+    
+    print(f"[INFO] CN Stats: AMF={amf_stats}, SMF={smf_stats}")
+
+    # 3. Merge gNB Data (Lookback)
+    # Logs are sparse (e.g. every 128 slots). xApp is frequent (every 10ms).
     log_map = {}
     for (f, s, r), data in log_metrics.items():
         log_map[f] = data
@@ -183,26 +232,19 @@ def merge_data(csv_file, log_file, output_file):
                 
         except Exception:
             rsrp_list.append(None)
-            ph_list.append(None)
-            pcmax_list.append(None)
-            sync_list.append(None)
-            harq_dl_list.append(None)
-            harq_ul_list.append(None)
-            dlsch_err_list.append(None)
-            ulsch_err_list.append(None)
+            # ... fill Nones for others ...
+            ph_list.append(None); pcmax_list.append(None); sync_list.append(None)
+            harq_dl_list.append(None); harq_ul_list.append(None)
+            dlsch_err_list.append(None); ulsch_err_list.append(None)
             rsrq_list.append(None)
 
         # 2. Estimate DL SINR from DL BLER (xApp data)
         try:
             bler = float(row['dl_bler'])
-            if bler < 0.001:
-                sinr_dl_list.append(25.0)
-            elif bler < 0.01:
-                sinr_dl_list.append(20.0)
-            elif bler < 0.1:
-                sinr_dl_list.append(15.0)
-            else:
-                sinr_dl_list.append(10.0)
+            if bler < 0.001: sinr_dl_list.append(25.0)
+            elif bler < 0.01: sinr_dl_list.append(20.0)
+            elif bler < 0.1: sinr_dl_list.append(15.0)
+            else: sinr_dl_list.append(10.0)
         except Exception:
             sinr_dl_list.append(None)
 
@@ -218,21 +260,29 @@ def merge_data(csv_file, log_file, output_file):
     df['est_rsrq'] = rsrq_list
     df['est_sinr_dl'] = sinr_dl_list
 
-    # 4. Reorder Columns for better readability
-    # Logical Grouping: ID -> Radio -> Throughput -> Errors -> MCS -> Buffers -> Raw Counters
+    # 4. Add CN Columns (Duplicate Global State across all rows)
+    # Since these are slow-changing/event-based, we just apply the experiment state
+    df['amf_state'] = amf_stats.get('amf_state', 'Unknown')
+    df['amf_auth_events'] = amf_stats.get('amf_auth_events', 0)
+    df['smf_pdu_sessions'] = smf_stats.get('smf_pdu_sessions', 0)
+    df['smf_pdu_status'] = smf_stats.get('smf_pdu_status', 'Unknown')
+
+
+    # 5. Reorder Columns
     desired_order = [
         # ID & Time
-        'timestamp', 'frame', 'slot', 'rnti', 'log_sync',
+        'timestamp', 'frame', 'slot', 'rnti', 'log_sync', 'amf_state', 'smf_pdu_status',
         
         # Radio Quality
         'log_rsrp', 'est_rsrq', 'est_sinr_dl', 'pusch_snr', 'pucch_snr', 'cqi', 'log_ph', 'log_pcmax',
         
         # Throughput & Load
-        'dl_thp_kbps', 'ul_thp_kbps', 'prb_tot_dl', 'prb_tot_ul', 'dl_prb', 'ul_prb',
+        'dl_thp_kbps', 'ul_thp_kbps', 'prb_tot_dl', 'prb_tot_ul', 'dl_prb', 'ul_prb', 'smf_pdu_sessions',
         
         # Errors & Reliability
         'dl_bler', 'ul_bler', 'log_dlsch_err', 'log_ulsch_err', 'log_harq_dl', 'log_harq_ul', 'rlc_retx',
-        
+        'amf_auth_events',
+
         # MCS & TBS
         'dl_mcs1', 'ul_mcs1', 'dl_tbs', 'ul_tbs',
         
@@ -242,28 +292,28 @@ def merge_data(csv_file, log_file, output_file):
     
     # Get all existing columns
     existing_cols = df.columns.tolist()
-    
-    # Construct final order: desired columns (that exist) + remaining columns
     final_order = [c for c in desired_order if c in existing_cols]
     remaining = [c for c in existing_cols if c not in final_order]
     final_order.extend(remaining)
     
     df = df[final_order]
 
-    # 5. Save
+    # 6. Save
     df.to_csv(output_file, index=False)
     print(f"[SUCCESS] Merged data saved to {output_file}")
     
     # Preview
-    print(df[final_order[:15]].head())
+    print(df.head())
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python3 merge_metrics.py <kpm_csv> <gnb_log> [output_csv]")
-        sys.exit(1)
-        
-    kpm_csv = sys.argv[1]
-    gnb_log = sys.argv[2]
-    out_csv = sys.argv[3] if len(sys.argv) > 3 else kpm_csv.replace(".csv", "_final.csv")
+    parser = argparse.ArgumentParser(description="Merge xApp CSV with gNB and CN logs")
+    parser.add_argument("kpm_csv", help="Input kpm_metrics.csv")
+    parser.add_argument("gnb_log", help="Input gnb_logs.txt")
+    parser.add_argument("out_csv", help="Output final dataset.csv")
+    parser.add_argument("--amf", help="AMF log file", default=None)
+    parser.add_argument("--smf", help="SMF log file", default=None)
+    parser.add_argument("--upf", help="UPF log file", default=None)
     
-    merge_data(kpm_csv, gnb_log, out_csv)
+    args = parser.parse_args()
+    
+    merge_data(args.kpm_csv, args.gnb_log, args.out_csv, args.amf, args.smf, args.upf)
